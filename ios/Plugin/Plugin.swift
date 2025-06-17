@@ -12,37 +12,42 @@ public class SavePassword: CAPPlugin, CAPBridgedPlugin {
 
     @objc func promptDialog(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let loginScreen = LoginScreenViewController()
-            loginScreen.usernameTextField.text = call.getString("username") ?? ""
-            loginScreen.passwordTextField.text = call.getString("password") ?? ""
-            self.bridge?.webView?.addSubview(loginScreen.view)
-            loginScreen.view.removeFromSuperview()
-        }
-    }
-}
+            guard let username = call.getString("username"),
+                  let password = call.getString("password") else {
+                call.reject("Missing username or password")
+                return
+            }
 
-class LoginScreenViewController: UIViewController {
-    let usernameTextField: UITextField = {
-        let textField = UITextField()
-        textField.frame.size.width = 1
-        textField.frame.size.height = 1
-        textField.textContentType = .username
-        return textField
-    }()
-    
-    let passwordTextField: UITextField = {
-        let textField = UITextField()
-        textField.frame.size.width = 1
-        textField.frame.size.height = 1
-        textField.textContentType = .password
-        return textField
-    }()
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
-        view.addSubview(usernameTextField)
-        view.addSubview(passwordTextField)
-        usernameTextField.becomeFirstResponder()
+            let loginVC = UIViewController()
+            loginVC.view.backgroundColor = .systemBackground
+
+            let usernameField = UITextField(frame: CGRect(x: 20, y: 100, width: 280, height: 40))
+            usernameField.placeholder = "Username"
+            usernameField.text = username
+            usernameField.textContentType = .username
+            usernameField.autocapitalizationType = .none
+            usernameField.borderStyle = .roundedRect
+
+            let passwordField = UITextField(frame: CGRect(x: 20, y: 160, width: 280, height: 40))
+            passwordField.placeholder = "Password"
+            passwordField.text = password
+            passwordField.textContentType = .password
+            passwordField.isSecureTextEntry = true
+            passwordField.borderStyle = .roundedRect
+
+            loginVC.view.addSubview(usernameField)
+            loginVC.view.addSubview(passwordField)
+
+            let nav = UINavigationController(rootViewController: loginVC)
+            nav.modalPresentationStyle = .formSheet
+
+            self.bridge?.viewController?.present(nav, animated: true) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    nav.dismiss(animated: true) {
+                        call.resolve()
+                    }
+                }
+            }
+        }
     }
 }
