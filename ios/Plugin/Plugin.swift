@@ -26,6 +26,7 @@ public class SavePassword: CAPPlugin, CAPBridgedPlugin {
             usernameField.text = username
             usernameField.textContentType = .username
             usernameField.autocapitalizationType = .none
+            usernameField.autocorrectionType = .no
             usernameField.borderStyle = .roundedRect
 
             let passwordField = UITextField(frame: CGRect(x: 20, y: 160, width: 280, height: 40))
@@ -38,11 +39,20 @@ public class SavePassword: CAPPlugin, CAPBridgedPlugin {
             loginVC.view.addSubview(usernameField)
             loginVC.view.addSubview(passwordField)
 
+            let loginButton = UIButton(frame: CGRect(x: 20, y: 220, width: 280, height: 44))
+            loginButton.setTitle("Login", for: .normal)
+            loginButton.setTitleColor(.white, for: .normal)
+            loginButton.backgroundColor = .systemBlue
+            loginButton.layer.cornerRadius = 6
+            loginVC.view.addSubview(loginButton)
+
+            usernameField.becomeFirstResponder()
+
             let nav = UINavigationController(rootViewController: loginVC)
             nav.modalPresentationStyle = .formSheet
 
             self.bridge?.viewController?.present(nav, animated: true) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     nav.dismiss(animated: true) {
                         call.resolve()
                     }
