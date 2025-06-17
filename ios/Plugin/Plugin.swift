@@ -3,73 +3,42 @@ import Capacitor
 import UIKit
 
 @objc(SavePassword)
-public class SavePassword: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "SavePassword"
-    public let jsName = "SavePassword"
-    public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "promptDialog", returnType: CAPPluginReturnPromise)
-    ]
-
-    private struct AssociatedKeys {
-        static var callKey = "CAPPluginCallKey"
-        static var navKey = "UINavigationControllerKey"
-    }
-
+public class SavePassword: CAPPlugin {
     @objc func promptDialog(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            guard let username = call.getString("username"),
-                  let password = call.getString("password") else {
-                call.reject("Missing username or password")
-                return
-            }
-
             let loginVC = UIViewController()
             loginVC.view.backgroundColor = .systemBackground
 
             let usernameField = UITextField(frame: CGRect(x: 20, y: 100, width: 280, height: 40))
-            usernameField.placeholder = "Username"
-            usernameField.text = username
+            usernameField.placeholder = "Email"
+            usernameField.text = call.getString("username") ?? ""
             usernameField.textContentType = .username
             usernameField.autocapitalizationType = .none
+            usernameField.autocorrectionType = .no
             usernameField.borderStyle = .roundedRect
 
             let passwordField = UITextField(frame: CGRect(x: 20, y: 160, width: 280, height: 40))
             passwordField.placeholder = "Password"
-            passwordField.text = password
+            passwordField.text = call.getString("password") ?? ""
             passwordField.textContentType = .password
             passwordField.isSecureTextEntry = true
             passwordField.borderStyle = .roundedRect
 
-            let submitButton = UIButton(type: .system)
-            submitButton.setTitle("Login", for: .normal)
-            submitButton.frame = CGRect(x: 20, y: 220, width: 280, height: 44)
-            submitButton.addTarget(self, action: #selector(self.submitTapped(_:)), for: .touchUpInside)
-
             loginVC.view.addSubview(usernameField)
             loginVC.view.addSubview(passwordField)
-            loginVC.view.addSubview(submitButton)
-
             usernameField.becomeFirstResponder()
 
+            // Let iOS show the iCloud prompt after delay
             let nav = UINavigationController(rootViewController: loginVC)
             nav.modalPresentationStyle = .formSheet
 
-            // Store references so submit button can access them later
-            objc_setAssociatedObject(submitButton, &AssociatedKeys.callKey, call, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-            objc_setAssociatedObject(submitButton, &AssociatedKeys.navKey, nav, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-
-            self.bridge?.viewController?.present(nav, animated: true)
-        }
-    }
-
-    @objc func submitTapped(_ sender: UIButton) {
-        guard let call = objc_getAssociatedObject(sender, &AssociatedKeys.callKey) as? CAPPluginCall,
-              let nav = objc_getAssociatedObject(sender, &AssociatedKeys.navKey) as? UINavigationController else {
-            return
-        }
-
-        nav.dismiss(animated: true) {
-            call.resolve()
+            self.bridge?.viewController?.present(nav, animated: true) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    nav.dismiss(animated: true) {
+                        call.resolve()
+                    }
+                }
+            }
         }
     }
 }
