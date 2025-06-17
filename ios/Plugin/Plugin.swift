@@ -1,8 +1,7 @@
-// Plugin.swift
 import Foundation
 import Capacitor
-import AuthenticationServices // <--- Crucial Import
 import UIKit
+import AuthenticationServices
 
 @objc(SavePassword)
 public class SavePassword: CAPPlugin, CAPBridgedPlugin {
@@ -20,21 +19,24 @@ public class SavePassword: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // Define the service identifier for the credential.
-            // This MUST match your website's domain exactly, and be configured in your
-            // app's Associated Domains (webcredentials:yourdomain.com) and AASA file.
-            let serviceIdentifier = ASCServiceIdentifier(identifier: "app.holbornassets.com", type: .web)
+            // This must match your Associated Domain setup
+            let serviceIdentifier = ASCredentialServiceIdentifier(
+                identifier: "app.holbornassets.com",
+                type: .domain
+            )
 
-            // Create the credential identity object with the username and password
-            let credentialIdentity = ASPasswordCredentialIdentity(serviceIdentifier: serviceIdentifier, user: username, password: password)
+            let credentialIdentity = ASPasswordCredentialIdentity(
+                serviceIdentifier: serviceIdentifier,
+                user: username,
+                recordIdentifier: nil
+            )
 
-            // Request the system to save this credential identity.
-            ASCCredentialIdentityStore.shared.saveCredentialIdentities([credentialIdentity]) { (error) in
+            ASCredentialIdentityStore.shared.saveCredentialIdentities([credentialIdentity]) { success, error in
                 if let error = error {
-                    print("Capacitor SavePassword Plugin Error: Failed to save credential identity: \(error.localizedDescription)")
+                    print("❌ SavePassword error: \(error.localizedDescription)")
                     call.reject("Failed to save credential identity: \(error.localizedDescription)")
                 } else {
-                    print("Capacitor SavePassword Plugin: Credential identity save request sent successfully.")
+                    print("✅ SavePassword: Save request sent successfully.")
                     call.resolve(["status": "prompt requested"])
                 }
             }
