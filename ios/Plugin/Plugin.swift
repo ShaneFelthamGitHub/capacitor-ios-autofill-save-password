@@ -1,6 +1,5 @@
 import Foundation
 import Capacitor
-import UIKit
 import AuthenticationServices
 
 @objc(SavePassword)
@@ -19,25 +18,43 @@ public class SavePassword: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // This must match your Associated Domain setup
+            // Set up the credential service identifier (matches webcredentials domain)
             let serviceIdentifier = ASCredentialServiceIdentifier(
                 identifier: "app.holbornassets.com",
                 type: .domain
             )
 
-            let credentialIdentity = ASPasswordCredentialIdentity(
-                serviceIdentifier: serviceIdentifier,
+            // Create a full credential with username and password
+            let credential = ASPasswordCredential(
                 user: username,
-                recordIdentifier: nil
+                password: password
             )
 
-            ASCredentialIdentityStore.shared.saveCredentialIdentities([credentialIdentity]) { success, error in
-                if let error = error {
-                    print("❌ SavePassword error: \(error.localizedDescription)")
-                    call.reject("Failed to save credential identity: \(error.localizedDescription)")
-                } else {
-                    print("✅ SavePassword: Save request sent successfully.")
-                    call.resolve(["status": "prompt requested"])
+            // Use iOS' shared credential store
+            let identityStore = ASCredentialIdentityStore.shared
+
+            // Check if the user has enabled credential storage
+            identityStore.getState { state in
+                guard state.isEnabled else {
+                    call.reject("Credential identity store is disabled on this device.")
+                    return
+                }
+
+                // Create an identity based on the credential
+                let credentialIdentity = ASPasswordCredentialIdentity(
+                    serviceIdentifier: serviceIdentifier,
+                    user: credential.user,
+                    recordIdentifier: nil
+                )
+
+                identityStore.saveCredentialIdentities([credentialIdentity]) { success, error in
+                    if let error = error {
+                        print("❌ SavePassword error: \(error.localizedDescription)")
+                        call.reject("Failed to save credential identity: \(error.localizedDescription)")
+                    } else {
+                        print("✅ SavePassword: Save request sent successfully.")
+                        call.resolve(["status": "prompt requested"])
+                    }
                 }
             }
         }
