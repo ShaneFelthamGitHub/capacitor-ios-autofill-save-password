@@ -1,63 +1,60 @@
-import Foundation
-import Capacitor
-import UIKit
+@objc func promptDialog(_ call: CAPPluginCall) {
+    DispatchQueue.main.async {
+        guard let username = call.getString("username"),
+              let password = call.getString("password") else {
+            call.reject("Missing username or password")
+            return
+        }
 
-@objc(SavePassword)
-public class SavePassword: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "SavePassword"
-    public let jsName = "SavePassword"
-    public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "promptDialog", returnType: CAPPluginReturnPromise)
-    ]
+        let loginVC = UIViewController()
+        loginVC.view.backgroundColor = .systemBackground
 
-    @objc func promptDialog(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            guard let username = call.getString("username"),
-                  let password = call.getString("password") else {
-                call.reject("Missing username or password")
-                return
-            }
+        let usernameField = UITextField(frame: CGRect(x: 20, y: 100, width: 280, height: 40))
+        usernameField.placeholder = "Username"
+        usernameField.text = username
+        usernameField.textContentType = .username
+        usernameField.autocapitalizationType = .none
+        usernameField.borderStyle = .roundedRect
 
-            let loginVC = UIViewController()
-            loginVC.view.backgroundColor = .systemBackground
+        let passwordField = UITextField(frame: CGRect(x: 20, y: 160, width: 280, height: 40))
+        passwordField.placeholder = "Password"
+        passwordField.text = password
+        passwordField.textContentType = .password
+        passwordField.isSecureTextEntry = true
+        passwordField.borderStyle = .roundedRect
 
-            let usernameField = UITextField(frame: CGRect(x: 20, y: 100, width: 280, height: 40))
-            usernameField.placeholder = "Username"
-            usernameField.text = username
-            usernameField.textContentType = .username
-            usernameField.autocapitalizationType = .none
-            usernameField.autocorrectionType = .no
-            usernameField.borderStyle = .roundedRect
+        let submitButton = UIButton(type: .system)
+        submitButton.setTitle("Login", for: .normal)
+        submitButton.frame = CGRect(x: 20, y: 220, width: 280, height: 44)
+        submitButton.addTarget(nil, action: #selector(self.submitTapped(_:)), for: .touchUpInside)
 
-            let passwordField = UITextField(frame: CGRect(x: 20, y: 160, width: 280, height: 40))
-            passwordField.placeholder = "Password"
-            passwordField.text = password
-            passwordField.textContentType = .password
-            passwordField.isSecureTextEntry = true
-            passwordField.borderStyle = .roundedRect
+        loginVC.view.addSubview(usernameField)
+        loginVC.view.addSubview(passwordField)
+        loginVC.view.addSubview(submitButton)
 
-            loginVC.view.addSubview(usernameField)
-            loginVC.view.addSubview(passwordField)
+        usernameField.becomeFirstResponder()
 
-            let loginButton = UIButton(frame: CGRect(x: 20, y: 220, width: 280, height: 44))
-            loginButton.setTitle("Login", for: .normal)
-            loginButton.setTitleColor(.white, for: .normal)
-            loginButton.backgroundColor = .systemBlue
-            loginButton.layer.cornerRadius = 6
-            loginVC.view.addSubview(loginButton)
+        let nav = UINavigationController(rootViewController: loginVC)
+        nav.modalPresentationStyle = .formSheet
 
-            usernameField.becomeFirstResponder()
+        // Store call and fields for access in button action
+        objc_setAssociatedObject(submitButton, &AssociatedKeys.callKey, call, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        objc_setAssociatedObject(submitButton, &AssociatedKeys.navKey, nav, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-            let nav = UINavigationController(rootViewController: loginVC)
-            nav.modalPresentationStyle = .formSheet
+        self.bridge?.viewController?.present(nav, animated: true)
+    }
+}
 
-            self.bridge?.viewController?.present(nav, animated: true) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    nav.dismiss(animated: true) {
-                        call.resolve()
-                    }
-                }
-            }
+@objc func submitTapped(_ sender: UIButton) {
+    if let call = objc_getAssociatedObject(sender, &AssociatedKeys.callKey) as? CAPPluginCall,
+       let nav = objc_getAssociatedObject(sender, &AssociatedKeys.navKey) as? UINavigationController {
+        nav.dismiss(animated: true) {
+            call.resolve()
         }
     }
+}
+
+private struct AssociatedKeys {
+    static var callKey = "CAPPluginCallKey"
+    static var navKey = "UINavigationControllerKey"
 }
