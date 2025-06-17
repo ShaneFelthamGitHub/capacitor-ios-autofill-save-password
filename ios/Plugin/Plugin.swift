@@ -1,62 +1,70 @@
 import Foundation
 import Capacitor
-import AuthenticationServices
+import UIKit
+import AuthenticationServices // Required for password APIs
 
 @objc(SavePassword)
-public class SavePassword: CAPPlugin, CAPBridgedPlugin {
+public class SavePassword: CAPPlugin, CAPBridgedPlugin, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+
     public let identifier = "SavePassword"
     public let jsName = "SavePassword"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "promptDialog", returnType: CAPPluginReturnPromise)
     ]
 
+    private var currentCall: CAPPluginCall?
+
     @objc func promptDialog(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
+            self.currentCall = call
+
             guard let username = call.getString("username"),
                   let password = call.getString("password") else {
                 call.reject("Missing username or password")
                 return
             }
 
-            // Set up the credential service identifier (matches webcredentials domain)
-            let serviceIdentifier = ASCredentialServiceIdentifier(
-                identifier: "app.holbornassets.com",
-                type: .domain
-            )
+            // Create a password credential.
+            let passwordCredential = ASPasswordCredential(user: username, password: password)
 
-            // Create a full credential with username and password
-            let credential = ASPasswordCredential(
-                user: username,
-                password: password
-            )
+            // Create an authorization request for password management.
+            let request = ASAuthorizationPasswordProvider().createRequest()
 
-            // Use iOS' shared credential store
-            let identityStore = ASCredentialIdentityStore.shared
+            // Use ASAuthorizationController to trigger the native prompt.
+            let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+            authorizationController.delegate = self
+            authorizationController.presentationContextProvider = self
+            authorizationController.performRequests()
 
-            // Check if the user has enabled credential storage
-            identityStore.getState { state in
-                guard state.isEnabled else {
-                    call.reject("Credential identity store is disabled on this device.")
-                    return
-                }
-
-                // Create an identity based on the credential
-                let credentialIdentity = ASPasswordCredentialIdentity(
-                    serviceIdentifier: serviceIdentifier,
-                    user: credential.user,
-                    recordIdentifier: nil
-                )
-
-                identityStore.saveCredentialIdentities([credentialIdentity]) { success, error in
-                    if let error = error {
-                        print("❌ SavePassword error: \(error.localizedDescription)")
-                        call.reject("Failed to save credential identity: \(error.localizedDescription)")
-                    } else {
-                        print("✅ SavePassword: Save request sent successfully.")
-                        call.resolve(["status": "prompt requested"])
-                    }
-                }
-            }
+            call.resolve(["status": "prompt requested, awaiting user interaction"])
         }
+    }
+
+    // MARK: - ASAuthorizationControllerDelegate
+
+    public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let passwordCredential = authorization.credential as? ASPasswordCredential {
+            print("✅ Authorization completed for user: \(passwordCredential.user)")
+            self.currentCall?.resolve(["status": "credential saved", "user": passwordCredential.user])
+        } else {
+            print("✅ Authorization completed with unknown credential type.")
+            self.currentCall?.resolve(["status": "completed with unknown credential type"])
+        }
+        self.currentCall = nil
+    }
+
+    public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        print("❌ Authorization error: \(error.localizedDescription)")
+        self.currentCall?.reject("Authorization failed: \(error.localizedDescription)")
+        self.currentCall = nil
+    }
+
+    // MARK: - ASAuthorizationControllerPresentationContextProviding
+
+    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        guard let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else {
+            fatalError("No key window found for presenting ASAuthorizationController.")
+        }
+        return window
     }
 }
